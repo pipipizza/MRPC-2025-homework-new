@@ -1,0 +1,38 @@
+﻿# 编译生成文件
+build/
+bin/
+obj/
+*.exe
+*.o
+*.a
+
+# C/C++编译文件
+*.out
+*.slo
+*.lo
+*.o
+*.obj
+*.dll
+*.so
+*.dylib
+
+# 编辑器/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志和临时文件
+*.log
+*.tmp
+*.temp
+
+# 依赖
+__pycache__/
+*.pyc
+*.pyo
