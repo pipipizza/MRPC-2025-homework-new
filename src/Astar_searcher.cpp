@@ -357,7 +357,7 @@ terminatePtr=terminatePtr->Father;
 
   return path;
 }
-
+//fianl commit before submission
 
 std::vector<Vector3d> Astarpath::pathSimplify(const vector<Vector3d> &path,
                                                double path_resolution) {
