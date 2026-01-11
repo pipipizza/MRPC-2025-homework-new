@@ -200,12 +200,14 @@ inline void Astarpath::AstarGetSucc(MappingNodePtr currentPtr,
 }
 
 double Astarpath::getHeu(MappingNodePtr node1, MappingNodePtr node2) {
+  // 计算欧几里得距离
+  double heu = (node1->coord - node2->coord).norm();
   
-  // 使用数字距离和一种类型的tie_breaker
-  double heu;
-  double tie_breaker;
+  // 增加 tie_breaker，防止在代价相同时产生大量冗余扩展
+  double p = 1.0 / 1000.0; // 扰动因子
+  double tie_breaker = (1.0 + p) * heu;
   
-  return heu;
+  return tie_breaker;
 }
 
 
