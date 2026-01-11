@@ -221,6 +221,7 @@ void Quadrotor::operator()(const Quadrotor::InternalState& x,
   Eigen::Matrix3d J_inv = J_.inverse();
   // 角速度导数
   omega_dot = J_inv * (total_moments - coriolis);
+  //fianl commit before submission
 
   motor_rpm_dot = (input_ - cur_state.motor_rpm) / motor_time_constant_;
 
