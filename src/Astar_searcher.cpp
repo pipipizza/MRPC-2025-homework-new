@@ -261,34 +261,48 @@ bool Astarpath::AstarSearch(Vector3d start_pt, Vector3d end_pt) {
    *
    * **/
 
-  while (!Openset.empty()) {
-    //1.弹出g+h最小的节点
-    //????
-    //2.判断是否是终点
-    //????
-    //3.拓展当前节点
-    //????
-    for(unsigned int i=0;i<neighborPtrSets.size();i++)
-    {
+while (!Openset.empty()) {
+    // 1. 弹出 f_score (g+h) 最小的节点
+    currentPtr = Openset.begin()->second;
+    Openset.erase(Openset.begin());
+    currentPtr->id = -1; // 标记为已经在 Close set 中
+
+    // 2. 判断是否是终点
+    if (currentPtr->index == end_idx) {
+        terminatePtr = currentPtr; // 记录终点指针用于回溯
+        return true; 
+    }
+
+    // 3. 拓展当前节点：获取邻居节点及其边的代价
+    AstarGetSucc(currentPtr, neighborPtrSets, edgeCostSets);
+
+    for (unsigned int i = 0; i < neighborPtrSets.size(); i++) {
+      neighborPtr = neighborPtrSets[i];
+      if (neighborPtr->id == -1) continue; // 已在 Close set
+
+      tentative_g_score = currentPtr->g_score + edgeCostSets[i];
       
-      if(neighborPtrSets[i]->id==-1)
-      {
-         continue;
-      }
-      tentative_g_score=currentPtr->g_score+edgeCostSets[i];
-      neighborPtr=neighborPtrSets[i];
-      if(isOccupied(neighborPtr->index))
-      continue;
-      if(neighborPtr->id==0)
-      {
-        //4.填写信息，完成更新
-        //???
+      if (isOccupied(neighborPtr->index)) continue; // 障碍物检查
+
+      if (neighborPtr->id == 0) { // 节点未被发现（不在 Open set）
+        // 4. 填写信息，完成更新
+        neighborPtr->id = 1;
+        neighborPtr->Father = currentPtr;
+        neighborPtr->g_score = tentative_g_score;
+        neighborPtr->f_score = tentative_g_score + getHeu(neighborPtr, endPtr);
+        neighborPtr->coord = gridIndex2coord(neighborPtr->index);
+        Openset.insert(make_pair(neighborPtr->f_score, neighborPtr));
         continue;
-      }
-      else if(neighborPtr->id==1)
-      {
-        //???
-      continue;
+      } 
+      else if (neighborPtr->id == 1) { // 已经在 Open set，检查是否需要更新更小的 g_score
+        if (neighborPtr->g_score > tentative_g_score) {
+          neighborPtr->g_score = tentative_g_score;
+          neighborPtr->Father = currentPtr;
+          neighborPtr->f_score = tentative_g_score + getHeu(neighborPtr, endPtr);
+          // 注意：实际应用中这里应更新 Openset 中的值，multimap 需要重新 insert
+          Openset.insert(make_pair(neighborPtr->f_score, neighborPtr));
+        }
+        continue;
       }
     }
   }
@@ -302,23 +316,32 @@ bool Astarpath::AstarSearch(Vector3d start_pt, Vector3d end_pt) {
 
 
 vector<Vector3d> Astarpath::getPath() {
-  vector<Vector3d> path;
-  vector<MappingNodePtr> front_path;
-do
-{
-terminatePtr->coord=gridIndex2coord(terminatePtr->index);
-front_path.push_back(terminatePtr);
-terminatePtr=terminatePtr->Father;
-}while(terminatePtr->Father!=NULL);
-  /**
-   *
-   * STEP 1.3:  追溯找到的路径
-   *
-   * **/
+    vector<Vector3d> path;
+    vector<MappingNodePtr> front_path;
 
-  // ???
+    // 1. 从终点指针开始回溯
+    MappingNodePtr tempPtr = terminatePtr;
 
-  return path;
+    // 确保指针不为空，一直回溯到起点（起点的 Father 为 NULL）
+    while (tempPtr != NULL) {
+        // 确保坐标已更新
+        tempPtr->coord = gridIndex2coord(tempPtr->index); 
+        front_path.push_back(tempPtr);
+        
+        // 移向父节点
+        tempPtr = tempPtr->Father; 
+    }
+
+    /**
+     * STEP 1.3: 追溯找到的路径
+     * 将采集到的节点反转，存入最终的 path 中
+     **/
+    // 使用反向迭代器将 front_path (终点->起点) 转换为 path (起点->终点)
+    for (auto it = front_path.rbegin(); it != front_path.rend(); ++it) {
+        path.push_back((*it)->coord);
+    }
+
+    return path;
 }
 
 
