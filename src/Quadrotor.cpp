@@ -171,8 +171,13 @@ void Quadrotor::operator()(const Quadrotor::InternalState& x,
   Eigen::Array4d motor_linear_velocity;
   Eigen::Array4d AOA;   //攻角的计算
   blade_linear_velocity = 0.104719755 * cur_state.motor_rpm.array() * prop_radius_;
+  // 补充电机线速度计算（沿机体z轴方向的速度分量，机体坐标系下速度为R^T * 世界坐标系速度）
+  Eigen::Vector3d v_body = R.transpose() * cur_state.v;
+  motor_linear_velocity = v_body(2) * Eigen::Array4d::Ones(); // 四旋翼电机均沿机体z轴分布，线速度一致
   for (int i = 0; i < 4; ++i){
-    AOA[i]   = alpha0 - atan2(motor_linear_velocity[i], blade_linear_velocity[i]) * 180 / 3.14159265;
+    // 避免除数为0，增加微小值鲁棒性
+    double denom = blade_linear_velocity[i] + 1e-8;
+    AOA[i]   = alpha0 - atan2(motor_linear_velocity[i], denom) * 180 / M_PI;
   }
 
 
@@ -186,7 +191,7 @@ void Quadrotor::operator()(const Quadrotor::InternalState& x,
                       motor_rpm_sq(3));
 
   double resistance = 0.1 *                                        // C
-                      3.14159265 * (arm_length_) * (arm_length_) * // S
+                      M_PI * (arm_length_) * (arm_length_) * // S（修正为π，原代码3.14159265替换为M_PI更规范）
                       cur_state.v.norm() * cur_state.v.norm();
 
 
@@ -197,14 +202,30 @@ void Quadrotor::operator()(const Quadrotor::InternalState& x,
   }
 
   x_dot = cur_state.v;
-  //请在这里补充完四旋翼飞机的动力学模型，提示：v_dot应该与重力，总推力，外力和空气阻力相关
-  // v_dot = //?????
+  // 补充v_dot计算：牛顿第二定律，世界坐标系下受力分析
+  // 1. 重力：世界坐标系下沿-z方向，大小mg
+  Eigen::Vector3d gravity = g_ * Eigen::Vector3d(0, 0, -1);
+  // 2. 推力：机体坐标系下沿+z方向，转换到世界坐标系为R*[0,0,thrust]^T
+  Eigen::Vector3d thrust_world = R * Eigen::Vector3d(0, 0, thrust);
+  // 3. 空气阻力：与速度方向相反，大小resistance，即 -resistance * vnorm
+  Eigen::Vector3d air_resistance = -resistance * vnorm;
+  // 4. 总加速度 = (总受力) / 质量，总受力 = 推力 + 重力 + 空气阻力 + 外力
+  v_dot = (thrust_world + gravity + air_resistance + external_force_) / mass_;
 
   acc_ = v_dot;
 
   R_dot = R * omega_vee;
-  //请在这里补充完四旋翼飞机的动力学模型，角速度导数的计算涉及到惯性矩阵J_的逆、力矩、科里奥利力（通过角速度与惯性矩阵和角速度的叉积来计算）和外部力矩等因素。
-  // omega_dot = //??????
+  // 补充omega_dot计算：欧拉动力学方程，机体坐标系下力矩平衡
+  // 欧拉方程：J*omega_dot + omega × (J*omega) = 总力矩
+  // 变形得：omega_dot = J^{-1} [ 总力矩 - omega × (J*omega) ]
+  // 总力矩 = 电机产生的力矩 + 外部力矩
+  Eigen::Vector3d total_moments = moments + external_moment_;
+  // 计算科里奥利力项：omega × (J*omega)
+  Eigen::Vector3d coriolis = cur_state.omega.cross(J_ * cur_state.omega);
+  // 惯性矩阵求逆，因J_是对角矩阵，逆矩阵为对角元素取倒数
+  Eigen::Matrix3d J_inv = J_.inverse();
+  // 角速度导数
+  omega_dot = J_inv * (total_moments - coriolis);
 
   motor_rpm_dot = (input_ - cur_state.motor_rpm) / motor_time_constant_;
 
