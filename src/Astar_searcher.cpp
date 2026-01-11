@@ -205,19 +205,6 @@ double Astarpath::getHeu(MappingNodePtr node1, MappingNodePtr node2) {
   double heu;
   double tie_breaker;
   
-    // 1. 计算3D曼哈顿距离（基础启发值，适配栅格，计算量小）
-  // 曼哈顿距离：|x1-x2| + |y1-y2| + |z1-z2|，乘以栅格分辨率转换为实际距离
-  double dx = abs(node1->index(0) - node2->index(0)) * resolution;
-  double dy = abs(node1->index(1) - node2->index(1)) * resolution;
-  double dz = abs(node1->index(2) - node2->index(2)) * resolution;
-  heu = dx + dy + dz;
-
-  // 2. 平局打破项（tie_breaker）：引导算法优先向目标方向扩展，减少搜索冗余
-  // 采用节点到目标的欧氏距离比例系数，取值范围0.01~0.1，不影响启发函数一致性
-  tie_breaker = 0.05 * (node1->coord - node2->coord).norm();
-  
-  // 最终启发值 = 基础距离 + 平局打破项
-  heu += tie_breaker;
   return heu;
 }
 
@@ -272,58 +259,44 @@ bool Astarpath::AstarSearch(Vector3d start_pt, Vector3d end_pt) {
    *
    * **/
 
-while (!Openset.empty()) {
-  // 1. 弹出 g+h 最小的节点（multimap按key升序排列，首元素即为f_score最小节点）
-  currentPtr = Openset.begin()->second;  // 获取首元素的节点指针
-  Openset.erase(Openset.begin());        // 从开放列表中移除该节点
-  currentPtr->id = -1;                   // 标记为已处理，加入关闭列表
-
-  // 2. 判断是否是终点（节点索引与目标索引一致即为终点）
-  if (currentPtr->index == endPtr->index) {
-    terminatePtr = currentPtr;  // 记录终点节点，用于后续路径追溯
-    return true;                // 路径找到，返回成功
-  }
-
-  // 3. 拓展当前节点（调用已有AstarGetSucc函数，生成邻域节点及边代价）
-  AstarGetSucc(currentPtr, neighborPtrSets, edgeCostSets);
-
-  for(unsigned int i=0; i<neighborPtrSets.size(); i++){
-    if(neighborPtrSets[i]->id == -1)
+  while (!Openset.empty()) {
+    //1.弹出g+h最小的节点
+    //????
+    //2.判断是否是终点
+    //????
+    //3.拓展当前节点
+    //????
+    for(unsigned int i=0;i<neighborPtrSets.size();i++)
     {
-       continue;  // 跳过已在关闭列表的节点
-    }
-    tentative_g_score = currentPtr->g_score + edgeCostSets[i];
-    neighborPtr = neighborPtrSets[i];
-    if(isOccupied(neighborPtr->index))
-      continue;  // 跳过障碍物节点
-    if(neighborPtr->id == 0)
-    {
-      // 4. 填写信息，完成更新（节点为未访问状态，加入开放列表）
-      neighborPtr->id = 1;                  // 标记为开放列表状态
-      neighborPtr->g_score = tentative_g_score;  // 更新g代价
-      neighborPtr->Father = currentPtr;     // 设置父节点，用于路径追溯
-      neighborPtr->f_score = tentative_g_score + getHeu(neighborPtr, endPtr);  // 计算f代价
-      Openset.insert(make_pair(neighborPtr->f_score, neighborPtr));  // 加入开放列表
-      continue;
-    }
-    else if(neighborPtr->id == 1)
-    {
-      if(neighborPtr->g_score > tentative_g_score){
-        neighborPtr->g_score = tentative_g_score;
-        neighborPtr->Father = currentPtr;
-        neighborPtr->f_score = tentative_g_score + getHeu(neighborPtr, endPtr);
-        Openset.insert(make_pair(neighborPtr->f_score, neighborPtr));
+      
+      if(neighborPtrSets[i]->id==-1)
+      {
+         continue;
       }
+      tentative_g_score=currentPtr->g_score+edgeCostSets[i];
+      neighborPtr=neighborPtrSets[i];
+      if(isOccupied(neighborPtr->index))
       continue;
+      if(neighborPtr->id==0)
+      {
+        //4.填写信息，完成更新
+        //???
+        continue;
+      }
+      else if(neighborPtr->id==1)
+      {
+        //???
+      continue;
+      }
     }
   }
-}
 
-ros::Time time_2 = ros::Time::now();
-if ((time_2 - time_1).toSec() > 0.1)
-  ROS_WARN("Time consume in Astar path finding is %f",
-           (time_2 - time_1).toSec());
-return false;  // 开放列表为空仍未找到终点，路径不存在
+  ros::Time time_2 = ros::Time::now();
+  if ((time_2 - time_1).toSec() > 0.1)
+    ROS_WARN("Time consume in Astar path finding is %f",
+             (time_2 - time_1).toSec());
+  return false;
+}
 
 
 vector<Vector3d> Astarpath::getPath() {
@@ -335,29 +308,17 @@ terminatePtr->coord=gridIndex2coord(terminatePtr->index);
 front_path.push_back(terminatePtr);
 terminatePtr=terminatePtr->Father;
 }while(terminatePtr->Father!=NULL);
-// STEP 1.3: 追溯找到的路径（补全部分）
-  // 1. 加入起点节点（循环终止于起点父节点，需补充起点）
-  terminatePtr->coord = gridIndex2coord(terminatePtr->index);
-  front_path.push_back(terminatePtr);
+  /**
+   *
+   * STEP 1.3:  追溯找到的路径
+   *
+   * **/
 
-  // 2. 反向追溯得到的是终点→起点，反转后转为起点→终点
-  reverse(front_path.begin(), front_path.end());
-
-  // 3. 提取坐标存入输出路径，避免节点指针冗余
-  for (auto& node_ptr : front_path) {
-    path.push_back(node_ptr->coord);
-  }
-
-  // 可选优化：移除连续重复节点（避免栅格对齐导致的冗余点）
-  auto it = unique(path.begin(), path.end(), 
-    [](const Vector3d& a, const Vector3d& b) {
-      return (a - b).norm() < 1e-6; // 小于微小阈值判定为同一节点
-    });
-  path.erase(it, path.end());
+  // ???
 
   return path;
 }
-//fianl commit before submission
+
 
 std::vector<Vector3d> Astarpath::pathSimplify(const vector<Vector3d> &path,
                                                double path_resolution) {
