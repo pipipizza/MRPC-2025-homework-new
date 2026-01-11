@@ -205,6 +205,19 @@ double Astarpath::getHeu(MappingNodePtr node1, MappingNodePtr node2) {
   double heu;
   double tie_breaker;
   
+    // 1. 计算3D曼哈顿距离（基础启发值，适配栅格，计算量小）
+  // 曼哈顿距离：|x1-x2| + |y1-y2| + |z1-z2|，乘以栅格分辨率转换为实际距离
+  double dx = abs(node1->index(0) - node2->index(0)) * resolution;
+  double dy = abs(node1->index(1) - node2->index(1)) * resolution;
+  double dz = abs(node1->index(2) - node2->index(2)) * resolution;
+  heu = dx + dy + dz;
+
+  // 2. 平局打破项（tie_breaker）：引导算法优先向目标方向扩展，减少搜索冗余
+  // 采用节点到目标的欧氏距离比例系数，取值范围0.01~0.1，不影响启发函数一致性
+  tie_breaker = 0.05 * (node1->coord - node2->coord).norm();
+  
+  // 最终启发值 = 基础距离 + 平局打破项
+  heu += tie_breaker;
   return heu;
 }
 
