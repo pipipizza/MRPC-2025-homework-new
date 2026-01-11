@@ -171,13 +171,8 @@ void Quadrotor::operator()(const Quadrotor::InternalState& x,
   Eigen::Array4d motor_linear_velocity;
   Eigen::Array4d AOA;   //攻角的计算
   blade_linear_velocity = 0.104719755 * cur_state.motor_rpm.array() * prop_radius_;
-  // 补充电机线速度计算（沿机体z轴方向的速度分量，机体坐标系下速度为R^T * 世界坐标系速度）
-  Eigen::Vector3d v_body = R.transpose() * cur_state.v;
-  motor_linear_velocity = v_body(2) * Eigen::Array4d::Ones(); // 四旋翼电机均沿机体z轴分布，线速度一致
   for (int i = 0; i < 4; ++i){
-    // 避免除数为0，增加微小值鲁棒性
-    double denom = blade_linear_velocity[i] + 1e-8;
-    AOA[i]   = alpha0 - atan2(motor_linear_velocity[i], denom) * 180 / M_PI;
+    AOA[i]   = alpha0 - atan2(motor_linear_velocity[i], blade_linear_velocity[i]) * 180 / 3.14159265;
   }
 
 
@@ -191,7 +186,7 @@ void Quadrotor::operator()(const Quadrotor::InternalState& x,
                       motor_rpm_sq(3));
 
   double resistance = 0.1 *                                        // C
-                      M_PI * (arm_length_) * (arm_length_) * // S（修正为π，原代码3.14159265替换为M_PI更规范）
+                      3.14159265 * (arm_length_) * (arm_length_) * // S
                       cur_state.v.norm() * cur_state.v.norm();
 
 
