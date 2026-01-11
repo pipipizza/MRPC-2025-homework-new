@@ -335,13 +335,25 @@ terminatePtr->coord=gridIndex2coord(terminatePtr->index);
 front_path.push_back(terminatePtr);
 terminatePtr=terminatePtr->Father;
 }while(terminatePtr->Father!=NULL);
-  /**
-   *
-   * STEP 1.3:  追溯找到的路径
-   *
-   * **/
+// STEP 1.3: 追溯找到的路径（补全部分）
+  // 1. 加入起点节点（循环终止于起点父节点，需补充起点）
+  terminatePtr->coord = gridIndex2coord(terminatePtr->index);
+  front_path.push_back(terminatePtr);
 
-  // ???
+  // 2. 反向追溯得到的是终点→起点，反转后转为起点→终点
+  reverse(front_path.begin(), front_path.end());
+
+  // 3. 提取坐标存入输出路径，避免节点指针冗余
+  for (auto& node_ptr : front_path) {
+    path.push_back(node_ptr->coord);
+  }
+
+  // 可选优化：移除连续重复节点（避免栅格对齐导致的冗余点）
+  auto it = unique(path.begin(), path.end(), 
+    [](const Vector3d& a, const Vector3d& b) {
+      return (a - b).norm() < 1e-6; // 小于微小阈值判定为同一节点
+    });
+  path.erase(it, path.end());
 
   return path;
 }
