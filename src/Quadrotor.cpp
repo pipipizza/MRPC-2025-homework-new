@@ -200,10 +200,7 @@ x_dot = cur_state.v;
   
   // 1. 补充线性动力学模型
   // v_dot = (重力 + 推力 + 外部力 - 阻力) / 质量
-  v_dot = (Eigen::Vector3d(0, 0, -g_ * mass_) + 
-           R * Eigen::Vector3d(0, 0, thrust) + 
-           external_force_ - 
-           vnorm * resistance) / mass_;
+v_dot = (R * Eigen::Vector3d(0, 0, thrust) + external_force_) / mass_ + Eigen::Vector3d(0, 0, -g_);
 
   acc_ = v_dot;
 
