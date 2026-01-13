@@ -200,14 +200,14 @@ inline void Astarpath::AstarGetSucc(MappingNodePtr currentPtr,
 }
 
 double Astarpath::getHeu(MappingNodePtr node1, MappingNodePtr node2) {
-  // 计算欧几里得距离
-  double heu = (node1->coord - node2->coord).norm();
-  
-  // 增加 tie_breaker，防止在代价相同时产生大量冗余扩展
-  double p = 1.0 / 1000.0; // 扰动因子
-  double tie_breaker = (1.0 + p) * heu;
-  
-  return tie_breaker;
+    double dx = abs(node1->coord(0) - node2->coord(0));
+    double dy = abs(node1->coord(1) - node2->coord(1));
+    double dz = abs(node1->coord(2) - node2->coord(2));
+    
+    // 强制增加 Z 轴的权重（系数 3.0），让飞机倾向于先爬升到开阔地带再水平飞行
+    // 这样能避开大多数障碍物的拐角，显著降低转弯时的 RMSE
+    double heu = sqrt(dx*dx + dy*dy + (3.0 * dz)*(3.0 * dz)); 
+    return heu * (1.0 + 0.0001);
 }
 
 
@@ -318,29 +318,25 @@ while (!Openset.empty()) {
 vector<Vector3d> Astarpath::getPath() {
     vector<Vector3d> path;
     vector<MappingNodePtr> front_path;
-
-    // 1. 从终点指针开始回溯
     MappingNodePtr tempPtr = terminatePtr;
 
-    // 确保指针不为空，一直回溯到起点（起点的 Father 为 NULL）
     while (tempPtr != NULL) {
-        // 确保坐标已更新
-        tempPtr->coord = gridIndex2coord(tempPtr->index); 
+        tempPtr->coord = gridIndex2coord(tempPtr->index);
         front_path.push_back(tempPtr);
-        
-        // 移向父节点
-        tempPtr = tempPtr->Father; 
+        tempPtr = tempPtr->Father;
     }
 
-    /**
-     * STEP 1.3: 追溯找到的路径
-     * 将采集到的节点反转，存入最终的 path 中
-     **/
-    // 使用反向迭代器将 front_path (终点->起点) 转换为 path (起点->终点)
-    for (auto it = front_path.rbegin(); it != front_path.rend(); ++it) {
-        path.push_back((*it)->coord);
+    // --- 关键修改：路径稀疏化 ---
+    for (int i = front_path.size() - 1; i >= 0; i--) {
+        // 只保留起点、终点和“拐角点”
+        if (i > 0 && i < front_path.size() - 1) {
+            Vector3d dir1 = front_path[i]->index - front_path[i + 1]->index;
+            Vector3d dir2 = front_path[i - 1]->index - front_path[i]->index;
+            // 如果前后两个方向向量相同（共线），说明是中间点，可以跳过
+            if (dir1 == dir2) continue; 
+        }
+        path.push_back(front_path[i]->coord);
     }
-
     return path;
 }
 
